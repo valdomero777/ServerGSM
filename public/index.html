@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Monitor GSM</title>
+  <style>
+    body { font-family: monospace; background: #1e1e1e; color: #d4d4d4; padding: 20px; }
+    h1   { color: #569cd6; }
+    .card {
+      background: #252526; border: 1px solid #3c3c3c;
+      border-radius: 8px; padding: 15px; margin: 10px 0;
+    }
+    table { width: 100%; border-collapse: collapse; }
+    th    { background: #37373d; padding: 8px; text-align: left; }
+    td    { padding: 8px; border-bottom: 1px solid #3c3c3c; }
+    .ok   { color: #4ec9b0; }
+    .btn  {
+      background: #0e639c; color: white; border: none;
+      padding: 8px 16px; cursor: pointer; border-radius: 4px;
+    }
+    .btn:hover { background: #1177bb; }
+  </style>
+</head>
+<body>
+
+<h1>📡 Monitor GSM — SIM800</h1>
+
+<div class="card">
+  <b>Estado del servidor:</b>
+  <span id="estado" class="ok">Verificando...</span>
+  <button class="btn" onclick="ping()" style="margin-left:15px">Ping</button>
+</div>
+
+<div class="card">
+  <b>Último dato recibido:</b>
+  <pre id="ultimo">—</pre>
+</div>
+
+<div class="card">
+  <b>Historial de registros:</b>
+  <table>
+    <thead>
+      <tr><th>#</th><th>Datos</th><th>Recibido en</th></tr>
+    </thead>
+    <tbody id="tabla"></tbody>
+  </table>
+</div>
+
+<script>
+  // Actualizar cada 5 segundos
+  setInterval(actualizar, 5000);
+  actualizar();
+
+  async function ping() {
+    const r = await fetch('/ping');
+    const t = await r.text();
+    document.getElementById('estado').textContent = t + ' ✓';
+  }
+
+  async function actualizar() {
+    // Último registro
+    const r1  = await fetch('/ultimo');
+    const d1  = await r1.json();
+    document.getElementById('ultimo').textContent = JSON.stringify(d1, null, 2);
+
+    // Historial
+    const r2  = await fetch('/historial');
+    const d2  = await r2.json();
+    const tbody = document.getElementById('tabla');
+    tbody.innerHTML = '';
+
+    d2.registros.forEach((reg, i) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${i + 1}</td>
+        <td><pre style="margin:0">${JSON.stringify(reg, null, 2)}</pre></td>
+        <td>${reg.recibido_en || '—'}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+</script>
+
+</body>
+</html>
