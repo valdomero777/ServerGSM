@@ -1,11 +1,19 @@
 const express = require('express');
 const app     = express();
-const PORT    = 3000;
 
-// ── Middleware ──────────────────────────────────────
+// Render asigna el puerto automáticamente
+const PORT = process.env.PORT || 3000;
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
+
+// ── Middleware para aceptar peticiones HTTP del SIM800 ──
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  next();
+});
 
 // Base de datos en memoria
 const registros = [];
