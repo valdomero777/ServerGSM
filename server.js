@@ -1,73 +1,85 @@
 const express = require('express');
 const app     = express();
+const PORT    = process.env.PORT || 3000;
 
-// Render asigna el puerto automáticamente
-const PORT = process.env.PORT || 3000;
+const registros = [];
 
+// ── Middleware ──────────────────────────────────────
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
 
-// ── Middleware para aceptar peticiones HTTP del SIM800 ──
+// ── Leer body crudo si no viene Content-Type ────────
 app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.body && Object.keys(req.body).length > 0)
+    return next();
+
+  let raw = '';
+  req.on('data', chunk => raw += chunk.toString());
+  req.on('end', () => {
+    if (raw)
+    {
+      try   { req.body = JSON.parse(raw); }
+      catch { req.body = { raw: raw };    }
+    }
+    next();
+  });
+});
+
+// ── Headers para permitir cualquier origen ──────────
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin',  '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   next();
 });
 
-// Base de datos en memoria
-const registros = [];
-
-// ── GET /ping — prueba de conexión ─────────────────
+// ── GET /ping ───────────────────────────────────────
 app.get('/ping', (req, res) => {
-  console.log(`[${timestamp()}] PING recibido desde: ${req.ip}`);
+  console.log(`[PING] ${timestamp()} desde ${req.ip}`);
   res.send('PONG');
 });
 
-// ── GET /datos — enviar datos simples ──────────────
+// ── GET /datos ──────────────────────────────────────
 app.get('/datos', (req, res) => {
-  console.log(`[${timestamp()}] GET /datos`);
+  console.log(`[DATOS] ${timestamp()}`);
   res.json({
     estado:       'OK',
-    mensaje:      'Servidor activo',
     hora:         timestamp(),
     total_envios: registros.length
   });
 });
 
-// ── POST /enviar — recibir datos del Arduino ───────
+// ── POST /enviar ────────────────────────────────────
 app.post('/enviar', (req, res) => {
-  const datos = req.body;
+  const datos      = req.body || {};
   datos.recibido_en = timestamp();
-
   registros.push(datos);
 
-  console.log(`[${timestamp()}] POST /enviar →`, datos);
+  console.log(`[POST /enviar] ${timestamp()} →`, JSON.stringify(datos));
 
-  res.json({
-    estado:  'OK',
-    mensaje: 'Datos guardados',
-    id:      registros.length
-  });
+  // Respuesta simple que el SIM800 pueda leer sin problema
+  res.status(200).send('OK');
 });
 
-// ── GET /historial — ver todos los registros ───────
+// ── GET /historial ──────────────────────────────────
 app.get('/historial', (req, res) => {
+  console.log(`[HISTORIAL] ${registros.length} registros`);
   res.json({
-    total:    registros.length,
+    total:     registros.length,
     registros: registros
   });
 });
 
-// ── GET /ultimo — último registro recibido ─────────
+// ── GET /ultimo ─────────────────────────────────────
 app.get('/ultimo', (req, res) => {
-  if (registros.length === 0)
-    return res.json({ estado: 'VACIO', mensaje: 'Sin datos aún' });
+  if (!registros.length)
+    return res.json({ estado: 'VACIO' });
 
   res.json(registros[registros.length - 1]);
 });
 
-// ── Inicio ─────────────────────────────────────────
+// ── Inicio ──────────────────────────────────────────
 app.listen(PORT, () => {
   console.log('╔══════════════════════════════════╗');
   console.log('║   Servidor GSM activo             ║');
@@ -81,7 +93,6 @@ app.listen(PORT, () => {
   console.log('╚══════════════════════════════════╝');
 });
 
-// ── Utilidad ───────────────────────────────────────
 function timestamp() {
   return new Date().toLocaleString('es-MX');
 }
